@@ -10,9 +10,9 @@ The script performs the following actions:
 - Installs PowerShell Core.
 
 .NOTES
-Version:        1.4
+Version:        1.0
 Author:         Darren Pilkington
-Creation Date:  04-03-2024
+Creation Date:  08-03-2024
 #>
 
 Write-Output "Installing Chocolatey with Git, Notepad++, and PowerShell Core"
