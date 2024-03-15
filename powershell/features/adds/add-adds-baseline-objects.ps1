@@ -235,15 +235,15 @@ $OuPath = "OU=AD-ActiveDirectory-Groups,OU=Application Groups,OU=Domain Groups,D
 $GroupName = "SVR-Deny-Interactive-Logon"
 Write-Output "Creating group $GroupName"
 try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
-catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "AD User objects that cannot logon via RDP or Locally"
+catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "AD User objects that cannot logon via RDP or Locally"}
 $GroupName = "SVR-Allow-Logon-As-A-Service"
 Write-Output "Creating group $GroupName"
 try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
-catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "AD User objects allowed to run as a service"
+catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "AD User objects allowed to run as a service"}
 $GroupName = "SVR-Application-Service-Accounts"
 Write-Output "Creating group $GroupName"
 try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
-catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "Application Service Accounts (Non Microsoft AD Managed) )"
+catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "Application Service Accounts (Non Microsoft AD Managed) )"}
 $existingGroups = @("SVR-Deny-Interactive-Logon", "SVR-Allow-Logon-As-A-Service")
 foreach ($group in $existingGroups) {try {
         Write-Output "Adding $GroupName to $group"
@@ -253,39 +253,39 @@ foreach ($group in $existingGroups) {try {
 $GroupName = "SVR-Allow-Logon-As-A-Batch"
 Write-Output "Creating group $GroupName"
 try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
-catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "AD User objects allowed to run a batch job"
+catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "AD User objects allowed to run a batch job"}
 $GroupName = "SVR-Allow-Run-A-Scheduled-Task"
 Write-Output "Creating group $GroupName"
 try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
-catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "AD User objects allowed to run a scheduled task with cached credentials"
+catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "AD User objects allowed to run a scheduled task with cached credentials"}
 $GroupName = "SVR-Disable-Strict-Passwords"
 Write-Output "Creating group $GroupName"
 try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
-catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "AD User objects with strict password requirements disabled"
+catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "AD User objects with strict password requirements disabled"}
 $GroupName = "RBAG-AD-Admins"
 Write-Output "Creating group $GroupName"
 try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
-catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "AD Administrators with change access to all AD services and objects"
+catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "AD Administrators with change access to all AD services and objects"}
 $GroupName = "RBAG-AD-Operations"
 Write-Output "Creating group $GroupName"
 try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
-catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "AD Administrators with privileged access to AD tools & services"
+catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "AD Administrators with privileged access to AD tools & services"}
 $GroupName = "RBAG-AD-User-Admins"
 Write-Output "Creating group $GroupName"
 try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
-catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "Administrators that can unlock and reset user password"
+catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "Administrators that can unlock and reset user password"}
 $GroupName = "RBAG-L3-SVR-Admin"
 Write-Output "Creating group $GroupName"
 try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
-catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "Server administrators that can manage all servers and AD tooling"
+catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "Server administrators that can manage all servers and AD tooling"}
 $GroupName = "RBAG-L2-SVR-Admin"
 Write-Output "Creating group $GroupName"
 try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
-catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "Server administrators that have administrator access to AD tools and AD member servers"
+catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "Server administrators that have administrator access to AD tools and AD member servers"}
 $GroupName = "RBAG-L1-SVR-Admin"
 Write-Output "Creating group $GroupName"
 try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
-catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "Server administrators that have local administrator access to AD member servers"
+catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "Server administrators that have local administrator access to AD member servers"}
 $OuPath = "OU=Server Local Admins,OU=Domain Groups,DC=$DomainPrefix,DC=$DomainSuffix"
 
 Write-Output "Adding $AdminUser to AD Group: RBAG-L3-SVR-Admin"
