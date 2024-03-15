@@ -30,8 +30,13 @@ $NewSiteName = "ADDS-Site-1"
 $ipconfig = Get-NetIPAddress -AddressFamily IPv4 -PrefixOrigin Dhcp, Manual | Where-Object { $_.InterfaceAlias -notlike "*Loopback*" } | Select-Object -First 1
 $subnetMaskLength = $ipconfig.PrefixLength
 $ipAddress = $ipconfig.IPAddress
-$subnetAddress = ($ipAddress -split '\.')[0..2] -join '.' + '.0'
+# Calculate subnet address correctly
+$ipBytes = $ipAddress -split "\." | ForEach-Object { [convert]::ToInt32($_, 10) }
+$maskBytes = 0xFFFFFFFF -shr (32 - $subnetMaskLength) -shl (32 - $subnetMaskLength)
+$subnetAddressBytes = $ipBytes[0..3] -band ($maskBytes -shr 24), (($maskBytes -shr 16) -band 0xFF), (($maskBytes -shr 8) -band 0xFF), ($maskBytes -band 0xFF)
+$subnetAddress = ($subnetAddressBytes -join ".")
 $NewSiteSubnet = "$subnetAddress/$subnetMaskLength"
+Write-Output "Detected Subnet for New Site: $NewSiteSubnet"
 
 Write-Output "Creating Baseline AD Objects"
 Import-Module ActiveDirectory
