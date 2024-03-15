@@ -1,30 +1,43 @@
 <#
 .SYNOPSIS
-This script installs Active Directory Domain Services and creates a new Active Directory Forest.
+This script configures a new Active Directory environment, including dynamic site and subnet creation, enabling the AD Recycle Bin, renaming the default site, creating organizational units (OUs), and setting up essential AD groups.
 
 .DESCRIPTION
-The script installs the AD Domain Services role, configures DNS settings, sets up the PDC as an authoritative time server, and performs additional configurations for a new AD forest. It includes enabling the AD Recycle Bin, renaming the default site, and associating a subnet with the new site based on the server's TCP/IP settings.
+This comprehensive PowerShell script automates the initial setup and configuration of a new Active Directory (AD) environment. Key features include:
+- Dynamically determining and configuring the subnet IP and mask for a new AD site based on the server's primary IPv4 address.
+- Enabling the AD Recycle Bin for enhanced object recovery.
+- Renaming the default site and associating it with the dynamically determined subnet.
+- Creating a structured OU hierarchy to organize domain resources effectively.
+- Establishing essential AD security groups for administrative roles and permissions.
+
+The script is designed to provide a solid foundation for a new AD deployment, ensuring critical configurations are in place and organized systematically.
+
+.PARAMETER NewSiteName
+Specifies the name for the new AD site. Default is "ADDS-Site-1".
+
+.PARAMETER AdminUser
+Specifies the administrator username to be used in various configurations. Default is "Administrator".
+
+.EXAMPLE
+.\ThisScriptName.ps1
+Runs the script with default parameters for NewSiteName ("ADDS-Site-1") and AdminUser ("Administrator").
+
+.EXAMPLE
+.\ThisScriptName.ps1 -NewSiteName "CustomSiteName" -AdminUser "CustomAdmin"
+Runs the script with custom values for the NewSiteName and AdminUser parameters. Replace "CustomSiteName" with your desired site name and "CustomAdmin" with your specific admin username.
 
 .NOTES
 Version: 1.0
 Author: IT Surgery
 Modification Date: 08-03-2024
 
-.PARAMETER AdDomainName
-The desired Active Directory domain name. Default is "adds.private".
-
-.PARAMETER AdNetbiosName
-The NetBIOS name of the domain. Default is "ADDS".
-
-.PARAMETER Password
-The password for the Administrator account. Default is a pre-set complex password.
-
-.EXAMPLE
-.\[ScriptName].ps1 -AdDomainName "example.com" -AdNetbiosName "EXAMPLE" -Password "YourComplexPassword!"
 #>
 
 # Variables
-$NewSiteName = "ADDS-Site-1"
+param(
+    [string]$NewSiteName = "ADDS-Site-1",
+    [string]$AdminUser = "Administrator"
+)
 
 # Dynamically determine subnet IP and mask for new site based on server's primary IPv4 address
 $ipconfig = Get-NetIPAddress -AddressFamily IPv4 -PrefixOrigin Dhcp, Manual | Where-Object { $_.InterfaceAlias -notlike "*Loopback*" } | Select-Object -First 1
@@ -216,3 +229,73 @@ if ($currentContainer -ne $fullOuPath) {
     redircmp $fullOuPath
     Write-Output "Default computer container redirected to $fullOuPath."
 } else {Write-Output "Default computer container is already set to $fullOuPath."}
+
+Write-Output "Creating AD Groups"
+$OuPath = "OU=AD-ActiveDirectory-Groups,OU=Application Groups,OU=Domain Groups,DC=$DomainPrefix,DC=$DomainSuffix"
+$GroupName = "SVR-Deny-Interactive-Logon"
+Write-Output "Creating group $GroupName"
+try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
+catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "AD User objects that cannot logon via RDP or Locally" -Credential $AdCredential}
+$GroupName = "SVR-Allow-Logon-As-A-Service"
+Write-Output "Creating group $GroupName"
+try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
+catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "AD User objects allowed to run as a service" -Credential $AdCredential}
+$GroupName = "SVR-Application-Service-Accounts"
+Write-Output "Creating group $GroupName"
+try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
+catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "Application Service Accounts (Non Microsoft AD Managed) )" -Credential $AdCredential}
+$existingGroups = @("SVR-Deny-Interactive-Logon", "SVR-Allow-Logon-As-A-Service")
+foreach ($group in $existingGroups) {try {
+        Write-Output "Adding $GroupName to $group"
+        Add-ADGroupMember -Identity $group -Members $GroupName}
+    catch {Write-Output "Error adding $GroupName to ${group}: $_"}
+}
+$GroupName = "SVR-Allow-Logon-As-A-Batch"
+Write-Output "Creating group $GroupName"
+try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
+catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "AD User objects allowed to run a batch job" -Credential $AdCredential}
+$GroupName = "SVR-Allow-Run-A-Scheduled-Task"
+Write-Output "Creating group $GroupName"
+try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
+catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "AD User objects allowed to run a scheduled task with cached credentials" -Credential $AdCredential}
+$GroupName = "SVR-Disable-Strict-Passwords"
+Write-Output "Creating group $GroupName"
+try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
+catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "AD User objects with strict password requirements disabled" -Credential $AdCredential}
+$GroupName = "RBAG-AD-Admins"
+Write-Output "Creating group $GroupName"
+try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
+catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "AD Administrators with change access to all AD services and objects" -Credential $AdCredential}
+$GroupName = "RBAG-AD-Operations"
+Write-Output "Creating group $GroupName"
+try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
+catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "AD Administrators with privileged access to AD tools & services" -Credential $AdCredential}
+$GroupName = "RBAG-AD-User-Admins"
+Write-Output "Creating group $GroupName"
+try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
+catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "Administrators that can unlock and reset user password" -Credential $AdCredential}
+$GroupName = "RBAG-L3-SVR-Admin"
+Write-Output "Creating group $GroupName"
+try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
+catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "Server administrators that can manage all servers and AD tooling" -Credential $AdCredential}
+$GroupName = "RBAG-L2-SVR-Admin"
+Write-Output "Creating group $GroupName"
+try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
+catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "Server administrators that have administrator access to AD tools and AD member servers" -Credential $AdCredential}
+$GroupName = "RBAG-L1-SVR-Admin"
+Write-Output "Creating group $GroupName"
+try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
+catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "Server administrators that have local administrator access to AD member servers" -Credential $AdCredential}
+$OuPath = "OU=Server Local Admins,OU=Domain Groups,DC=$DomainPrefix,DC=$DomainSuffix"
+
+Write-Output "Adding $AdminUser to AD Group: RBAG-L3-SVR-Admin"
+$group = "RBAG-L3-SVR-Admin"
+try {
+    $isMember = Get-ADGroupMember -Identity $group | Where-Object { $_.SamAccountName -eq "$AdminUser" }
+    if ($isMember) {
+        Write-Output "User $DomainNetbiosName\$AdminUser is already a member of the group $group"
+    } else {
+        Add-ADGroupMember -Identity $group -Members "$AdminUser" -ErrorAction Continue
+        Write-Output "Added $AdminUser to $group"
+    }
+} catch {Write-Output "An error occurred while processing $AdminUser for ${group}: $_"}
