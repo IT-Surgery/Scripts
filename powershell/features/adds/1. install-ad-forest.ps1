@@ -1,8 +1,32 @@
+<#
+.SYNOPSIS
+This script installs Active Directory Domain Services and creates a new Active Directory Forest.
+
+.DESCRIPTION
+The script installs the AD Domain Services role, configures DNS settings, sets up the PDC as an authoritative time server, and performs additional configurations for a new AD forest.
+
+.NOTES
+Version: 1.0
+Author: IT Surgery
+Modification Date: 08-03-2024
+
+.PARAMETER AdDomainName
+The desired Active Directory domain name. Default is "adds.private".
+
+.PARAMETER AdNetbiosName
+The NetBIOS name of the domain. Default is "ADDS".
+
+.PARAMETER Password
+The password for the Administrator account. Default is a pre-set complex password.
+
+.EXAMPLE
+.\[ScriptName].ps1 -AdDomainName "example.com" -AdNetbiosName "EXAMPLE" -Password "YourComplexPassword!"
+#>
+
 param(
     [string]$AdDomainName = "adds.private",
     [string]$AdNetbiosName = "ADDS",
-    [string]$AdPassword = "C4ang3M3as@p01!",
-    [string]$AdAdmin = "AD-Admin" # New parameter for the administrator username
+    [string]$AdPassword = "C4ang3M3as@p01!"
 )
 
 # Function to write output to both console and log file
@@ -31,14 +55,65 @@ $AdSysvolPath = "${AdDisk}ADDS\SYSVOL"
 
 Write-Log "Checking Active Directory Domain Services (ADDS) prerequisites."
 
-# Rest of the script remains unchanged up to the installation part...
+# Check if the server is part of a domain
+try {
+    $currentDomain = Get-WmiObject Win32_ComputerSystem | Select-Object -ExpandProperty Domain
+    if ($currentDomain -eq $AdDomainName) {
+        Write-Log "The server is already a member of the domain '$AdDomainName'."
+        $isDomainMember = $true
+    } else {
+        Write-Log "The server is not a member of the domain '$AdDomainName'."
+        $isDomainMember = $false
+    }
+} catch {
+    Write-Log "Failed to determine domain membership status. Assuming the server is not a member of any domain."
+    $isDomainMember = $false
+}
 
-# After Active Directory setup completion, create a new administrator user
-Write-Log "Creating a new administrator user: $AdAdmin"
-$AdUserCredential = ConvertTo-SecureString $AdPassword -AsPlainText -Force
-New-ADUser -Name $AdAdmin -GivenName "AD" -Surname "Admin" -UserPrincipalName "$AdAdmin@$AdDomainName" -SamAccountName $AdAdmin -AccountPassword $AdUserCredential -PasswordNeverExpires $true -Enabled $true -Path "CN=Users,DC=$(($AdDomainName -split '\.')[0]),DC=$(($AdDomainName -split '\.')[1])"
+# Check if AD Domain Services role is installed
+$adRole = Get-WindowsFeature -Name 'AD-Domain-Services'
+if ($adRole.InstallState -eq 'Installed' -and $isDomainMember) {
+    Write-Log "Active Directory Domain Services (ADDS) role is installed and the server is a member of a domain."
+} else {
+    Write-Log "Installing Active Directory Domain Services (ADDS)"
+    Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools
+    Import-Module ADDSDeployment
 
-Write-Log "New administrator user '$AdAdmin' created successfully."
+    Install-ADDSForest `
+        -CreateDnsDelegation:$false `
+        -DatabasePath $AdDbPath `
+        -DomainMode "7" `
+        -DomainName $AdDomainName `
+        -DomainNetbiosName $AdNetbiosName `
+        -ForestMode "7" `
+        -InstallDns:$true `
+        -LogPath $AdLogPath `
+        -NoRebootOnCompletion:$true `
+        -SysvolPath $AdSysvolPath `
+        -Force:$true `
+        -SafeModeAdministratorPassword $Credential
+    Write-Log "Active Directory Domain Services setup has initiated."
+}
+
+# Setting DNS suffix for all active network connections
+Write-Log "Setting the DNS suffix for all active network connections to $AdDomainName"
+$activeAdapters = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' }
+foreach ($adapter in $activeAdapters) {
+    Set-DnsClient -InterfaceIndex $adapter.ifIndex -ConnectionSpecificSuffix $AdDomainName
+    Write-Log "Set DNS suffix for $($adapter.Name) to $AdDomainName."
+}
+
+# Configuring the PDC as an authoritative time server
+$ntpKeyPath = "HKLM:\SYSTEM\CurrentControlSet\Services\W32Time\Parameters"
+$ntpServersValue = "pool.ntp.org,0x9" # Modify as necessary
+$configKeyPath = "HKLM:\SYSTEM\CurrentControlSet\Services\W32Time\Config"
+$announceFlagsValue = 5 # PDC should be set to 5 to act as a reliable time source
+
+Write-Log "Configuring the PDC as an authoritative time server"
+Set-ItemProperty -Path $ntpKeyPath -Name "NtpServer" -Value $ntpServersValue
+Set-ItemProperty -Path $configKeyPath -Name "AnnounceFlags" -Value $announceFlagsValue
+Set-Service -Name w32time -StartupType Automatic
+Start-Service w32time
 
 Write-Log "Active Directory Domain Services setup has completed."
 Write-Log "Rebooting to complete ADDS installation."
