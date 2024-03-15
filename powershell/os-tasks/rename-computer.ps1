@@ -15,7 +15,7 @@ The script performs the following actions:
 
 .NOTES
 Version:        1.0
-Author:         Your Name
+Author:         IT Surgery
 Modification Date:  08-03-2024
 
 To run this script and pass the new computer name as a parameter, you would call it from the PowerShell command line like this:
