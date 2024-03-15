@@ -30,11 +30,22 @@ $NewSiteName = "ADDS-Site-1"
 $ipconfig = Get-NetIPAddress -AddressFamily IPv4 -PrefixOrigin Dhcp, Manual | Where-Object { $_.InterfaceAlias -notlike "*Loopback*" } | Select-Object -First 1
 $subnetMaskLength = $ipconfig.PrefixLength
 $ipAddress = $ipconfig.IPAddress
-# Calculate subnet address correctly
-$ipBytes = $ipAddress -split "\." | ForEach-Object { [convert]::ToInt32($_, 10) }
-$maskBytes = 0xFFFFFFFF -shr (32 - $subnetMaskLength) -shl (32 - $subnetMaskLength)
-$subnetAddressBytes = $ipBytes[0..3] -band ($maskBytes -shr 24), (($maskBytes -shr 16) -band 0xFF), (($maskBytes -shr 8) -band 0xFF), ($maskBytes -band 0xFF)
-$subnetAddress = ($subnetAddressBytes -join ".")
+# Simplify subnet calculation to ensure correctness
+function ConvertTo-Binary {
+    param (
+        [int]$decimal
+    )
+    $binary = [convert]::ToString($decimal, 2)
+    return $binary.PadLeft(8, '0')
+}
+$ipBinary = ($ipAddress -split "\." | ForEach-Object { ConvertTo-Binary -decimal $_ }) -join ""
+$subnetBinary = $ipBinary.Substring(0, $subnetMaskLength).PadRight(32, '0')
+$subnetAddressBytes = @()
+for ($i = 0; $i -lt 32; $i += 8) {
+    $byte = $subnetBinary.Substring($i, 8)
+    $subnetAddressBytes += [convert]::ToInt32($byte, 2)
+}
+$subnetAddress = $subnetAddressBytes -join "."
 $NewSiteSubnet = "$subnetAddress/$subnetMaskLength"
 Write-Output "Detected Subnet for New Site: $NewSiteSubnet"
 
