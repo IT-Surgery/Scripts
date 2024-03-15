@@ -274,21 +274,12 @@ $GroupName = "RBAG-AD-User-Admins"
 Write-Output "Creating group $GroupName"
 try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
 catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "Administrators that can unlock and reset user password"}
-$GroupName = "RBAG-L3-SVR-Admin"
+$GroupName = "RBAG-SVR-Admin"
 Write-Output "Creating group $GroupName"
 try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
 catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "Server administrators that can manage all servers and AD tooling"}
-$GroupName = "RBAG-L2-SVR-Admin"
-Write-Output "Creating group $GroupName"
-try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
-catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "Server administrators that have administrator access to AD tools and AD member servers"}
-$GroupName = "RBAG-L1-SVR-Admin"
-Write-Output "Creating group $GroupName"
-try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
-catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "Server administrators that have local administrator access to AD member servers"}
-$OuPath = "OU=Server Local Admins,OU=Domain Groups,DC=$DomainPrefix,DC=$DomainSuffix"
 
-Write-Output "Adding $AdminUser to AD Group: RBAG-L3-SVR-Admin"
+Write-Output "Adding $AdminUser to AD Group: RBAG-SVR-Admin"
 $group = "RBAG-L3-SVR-Admin"
 try {
     $isMember = Get-ADGroupMember -Identity $group | Where-Object { $_.SamAccountName -eq "$AdminUser" }
