@@ -61,13 +61,27 @@ foreach ($FeatureName in $desiredFeatures) {
     }
 }
 
+Import-Module ActiveDirectory
+
+$timeout = [datetime]::Now.AddMinutes(30)
+$found = $false
+while ([datetime]::Now -lt $timeout -and -not $found) {
+    $events = Get-WinEvent -LogName "Active Directory Web Services" | Select-Object -First 10
+    foreach ($event in $events) {
+        # Replace 'YourSuccessMessageHere' with the actual message or event ID you're looking for
+        if ($event.Message -like "*Active Directory Web Services is now servicing the specified directory instance*") {
+            $found = $true
+            Write-Output "Found the desired event in AD Web Services log!"
+            Write-Output "Active Directory Web Services is now operatoinal."
+            break
+        }
+    }
+    if (-not $found) {Start-Sleep -Seconds 30}
+}
+if (-not $found) {Write-Output "Timeout reached without finding the desired event in AD Web Services log."}
+
 # Check the flag and reboot if required
 if ($rebootRequired) {
     Log-Message "Rebooting the computer due to feature installation."
     Restart-Computer -Force
-} else {
-    Log-Message "No reboot required."
-}
-
-Log-Message "Import the PSReadLine module"
-Import-Module -Name PSReadLine -Verbose:$false
+} else {Log-Message "No reboot required."}
