@@ -94,3 +94,125 @@ try {
     New-ADReplicationSubnet -Name $NewSiteSubnet -Site $NewSiteName -Location "$NewSiteName"
     Write-Output "Subnet $NewSiteSubnet associated with site $NewSiteName"
 }
+
+# Get the FQDN of the domain the server is a member of
+$fqdn = (Get-ADDomain).DNSRoot
+$domainParts = $fqdn -split "\."
+$DomainPrefix = $domainParts[0]
+$DomainSuffix = $domainParts[1]
+
+Write-Output "Creating OUs"
+$ouName = "Domain Groups"
+$ou = Try {Get-ADOrganizationalUnit -Filter { Name -eq $ouName }} Catch {$null}
+if ($null -eq $ou) {
+    New-ADOrganizationalUnit -Name $ouName -Path "DC=$DomainPrefix,DC=$DomainSuffix"
+} else {Write-Output "OU $ouName already exists."}
+$ouName = "Application Groups"
+$ou = Try {Get-ADOrganizationalUnit -Filter { Name -eq $ouName }} Catch {$null}
+if ($null -eq $ou) {
+    New-ADOrganizationalUnit -Name $ouName -Path "OU=Domain Groups,DC=$DomainPrefix,DC=$DomainSuffix"
+} else {Write-Output "OU $ouName already exists."}
+$ouName = "Server Local Admins"
+$ou = Try {Get-ADOrganizationalUnit -Filter { Name -eq $ouName }} Catch {$null}
+if ($null -eq $ou) {
+    New-ADOrganizationalUnit -Name $ouName -Path "OU=Domain Groups,DC=$DomainPrefix,DC=$DomainSuffix"
+} else {Write-Output "OU $ouName already exists."}
+$ouName = "AD-ActiveDirectory-Groups"
+$ou = Try {Get-ADOrganizationalUnit -Filter { Name -eq $ouName }} Catch {$null}
+if ($null -eq $ou) {
+    New-ADOrganizationalUnit -Name $ouName -Path "OU=Application Groups,OU=Domain Groups,DC=$DomainPrefix,DC=$DomainSuffix"
+} else {Write-Output "OU $ouName already exists."}
+$ouName = "Domain Servers"
+$ou = Try {Get-ADOrganizationalUnit -Filter { Name -eq $ouName }} Catch {$null}
+if ($null -eq $ou) {
+    New-ADOrganizationalUnit -Name $ouName -Path "DC=$DomainPrefix,DC=$DomainSuffix"
+} else {Write-Output "OU $ouName already exists."}
+$ouName = "AD-ActiveDirectory-Servers"
+$ou = Try {Get-ADOrganizationalUnit -Filter { Name -eq $ouName }} Catch {$null}
+if ($null -eq $ou) {
+    New-ADOrganizationalUnit -Name $ouName -Path "OU=Domain Servers,DC=$DomainPrefix,DC=$DomainSuffix"
+} else {Write-Output "OU $ouName already exists."}
+$ouName = "Domain Users"
+$ou = Try {Get-ADOrganizationalUnit -Filter { Name -eq $ouName }} Catch {$null}
+if ($null -eq $ou) {
+    New-ADOrganizationalUnit -Name $ouName -Path "DC=$DomainPrefix,DC=$DomainSuffix"
+} else {Write-Output "OU $ouName already exists."}
+$ouName = "Privileged Users"
+$ou = Try {Get-ADOrganizationalUnit -Filter { Name -eq $ouName }} Catch {$null}
+if ($null -eq $ou) {
+    New-ADOrganizationalUnit -Name $ouName -Path "OU=Domain Users,DC=$DomainPrefix,DC=$DomainSuffix"
+} else {Write-Output "OU $ouName already exists."}
+$ouName = "Non-Privileged Users"
+$ou = Try {Get-ADOrganizationalUnit -Filter { Name -eq $ouName }} Catch {$null}
+if ($null -eq $ou) {
+    New-ADOrganizationalUnit -Name $ouName -Path "OU=Domain Users,DC=$DomainPrefix,DC=$DomainSuffix"
+} else {Write-Output "OU $ouName already exists."}
+$ouName = "Service Accounts"
+$ou = Try {Get-ADOrganizationalUnit -Filter { Name -eq $ouName }} Catch {$null}
+if ($null -eq $ou) {
+    New-ADOrganizationalUnit -Name $ouName -Path "OU=Domain Users,DC=$DomainPrefix,DC=$DomainSuffix"
+} else {Write-Output "OU $ouName already exists."}
+$ouName = "IDM Groups"
+$ou = Try {Get-ADOrganizationalUnit -Filter { Name -eq $ouName }} Catch {$null}
+if ($null -eq $ou) {
+    New-ADOrganizationalUnit -Name $ouName -Path "DC=$DomainPrefix,DC=$DomainSuffix"
+} else {Write-Output "OU $ouName already exists."}
+$ouName = "IDM Host Groups"
+$ou = Try {Get-ADOrganizationalUnit -Filter { Name -eq $ouName }} Catch {$null}
+if ($null -eq $ou) {
+    New-ADOrganizationalUnit -Name $ouName -Path "OU=IDM Groups,DC=$DomainPrefix,DC=$DomainSuffix"
+} else {Write-Output "OU $ouName already exists."}
+$ouName = "IDM Server Local Admins"
+$ou = Try {Get-ADOrganizationalUnit -Filter { Name -eq $ouName }} Catch {$null}
+if ($null -eq $ou) {
+    New-ADOrganizationalUnit -Name $ouName -Path "OU=IDM Groups,DC=$DomainPrefix,DC=$DomainSuffix"
+} else {Write-Output "OU $ouName already exists."}
+
+Write-Output "Creating Block All GPOs OU and blocking GPO inheritance"
+$ouName = "Block All GPOs"
+$ouPath = "OU=Domain Servers,DC=$DomainPrefix,DC=$DomainSuffix"
+$ou = Try {Get-ADOrganizationalUnit -Filter { Name -eq $ouName }} Catch {$null}
+if ($null -eq $ou) {
+    $ou = New-ADOrganizationalUnit -Name $ouName -Path $ouPath
+    Write-Output "The $ouName OU has been created ..."
+    $retryCount = 0
+    $maxRetries = 60
+    $retryInterval = 10 # seconds
+    do {
+        Start-Sleep -Seconds $retryInterval
+        $ou = Try {Get-ADOrganizationalUnit -Filter { Name -eq $ouName }} Catch {$null}
+        $retryCount++
+    } while ($null -eq $ou.DistinguishedName -and $retryCount -lt $maxRetries)
+    if ($null -eq $ou.DistinguishedName) {
+        Write-Output "Failed to retrieve the OU after $maxRetries attempts."
+        return}
+    Write-Output "Blocking GPO inheritance for $ouName ..."
+    Set-GPInheritance -Target $ou.DistinguishedName -IsBlocked Yes} else {
+    Write-Output "OU $ouName already exists."
+    Write-Output "Checking if GPO inheritance is already blocked ..."
+    $inheritance = Get-GPInheritance -Target $ou.DistinguishedName
+    Write-Output "Blocked Inheritance Value Is $($inheritance.GpoInheritanceBlocked)"
+    if ($inheritance.GpoInheritanceBlocked -ne "Yes") {
+        Set-GPInheritance -Target $ou.DistinguishedName -IsBlocked Yes
+        Write-Output "GPO inheritance blocked for $ouName."
+    } else {Write-Output "GPO inheritance is already blocked for $ouName."}
+}
+
+Write-Output "Creating Default Computer Staging OU"
+$ouName = "Staging"
+$ouPath = "OU=Domain Servers,DC=$DomainPrefix,DC=$DomainSuffix"
+$fullOuPath = "OU=$ouName,$ouPath"
+$ou = Try {Get-ADOrganizationalUnit -Filter { Name -eq $ouName }} Catch {$null}
+if ($null -eq $ou) {
+    New-ADOrganizationalUnit -Name $ouName -Path $ouPath
+    Write-Output "OU $ouName created."
+} else {Write-Output "OU $ouName already exists."}
+Write-Output "Redirecting default computer container to the Staging OU ..."
+# Retrieve the current default location for new computer objects
+$currentContainer = (Get-ADDomain).ComputersContainer
+Write-Output "Current default computer container is $currentContainer."
+# Check if the current container matches the desired container
+if ($currentContainer -ne $fullOuPath) {
+    redircmp $fullOuPath
+    Write-Output "Default computer container redirected to $fullOuPath."
+} else {Write-Output "Default computer container is already set to $fullOuPath."}
