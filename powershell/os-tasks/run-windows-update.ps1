@@ -43,8 +43,10 @@ Import-Module PSWindowsUpdate
 Add-WUServiceManager -ServiceID 7971f918-a847-4430-9279-4a52d1efe18d -Confirm:$false
 
 # Check if D:\ is available and is not a CD/DVD drive
-$driveD = Get-PSDrive -Name D -ErrorAction SilentlyContinue
-if ($driveD -and $driveD.Provider -eq 'FileSystem') {
+# Get all available drives
+$allDrives = Get-PSDrive -PSProvider FileSystem
+$driveD = $allDrives | Where-Object { $_.Root -eq 'D:\' }
+if ($driveD) {
     Write-Output "D:\ is available as a local disk. Logs will be written to D:\Logs\WindowsUpdate"
     $logsDir = "D:\Logs\WindowsUpdate"
 } else {
