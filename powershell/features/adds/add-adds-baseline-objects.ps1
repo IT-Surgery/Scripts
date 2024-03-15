@@ -280,7 +280,7 @@ try {Get-ADGroup -Identity $GroupName -ErrorAction SilentlyContinue}
 catch {New-ADGroup -Name $GroupName -Path $OuPath -GroupScope Global -GroupCategory Security -Description "Server administrators that can manage all servers and AD tooling"}
 
 Write-Output "Adding $AdminUser to AD Group: RBAG-SVR-Admin"
-$group = "RBAG-L3-SVR-Admin"
+$group = "RBAG-SVR-Admin"
 try {
     $isMember = Get-ADGroupMember -Identity $group | Where-Object { $_.SamAccountName -eq "$AdminUser" }
     if ($isMember) {
