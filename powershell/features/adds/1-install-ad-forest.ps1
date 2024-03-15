@@ -111,6 +111,7 @@ $announceFlagsValue = 5 # PDC should be set to 5 to act as a reliable time sourc
 
 Write-Log "Configuring the PDC as an authoritative time server"
 Set-ItemProperty -Path $ntpKeyPath -Name "NtpServer" -Value $ntpServersValue
+Set-ItemProperty -Path $ntpKeyPath -Name "Type" -Value ntp
 Set-ItemProperty -Path $configKeyPath -Name "AnnounceFlags" -Value $announceFlagsValue
 Set-Service -Name w32time -StartupType Automatic
 Start-Service w32time
