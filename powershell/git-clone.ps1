@@ -29,21 +29,42 @@ Creation Date:  03-15-2024
 # Define the repository URL
 $repoUrl = 'https://github.com/IT-Surgery/Scripts.git'
 
-Write-Output "Installing PowerShell Modules"
+# Determine the logs directory based on the availability of the D:\ drive
+$logDrive = if (Test-Path D:\) { "D:\" } else { "C:\" }
+$logPath = Join-Path -Path $logDrive -ChildPath "Logs\Git\"
+
+# Create the logs directory if it does not exist
+if (-not (Test-Path $logPath)) {
+    New-Item -ItemType Directory -Path $logPath -Force | Out-Null
+}
+
+# Define the log file name with current date and time
+$dateTime = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
+$logFile = "Git-Clone-$dateTime.log"
+$logFilePath = Join-Path -Path $logPath -ChildPath $logFile
+
+# Function to write output to both console and log file
+function Write-Log {
+    Param ([string]$Message)
+    Write-Output $Message
+    $Message | Out-File -FilePath $logFilePath -Append -Encoding UTF8
+}
+
+Write-Log "Installing PowerShell Modules"
 Install-PackageProvider -Name NuGet -Force
 $modules = 'PackageManagement', 'PendingReboot'
 foreach ($module in $modules) {
     if (Get-Module -ListAvailable -Name $module) {
-        Write-Output "Module $module is already installed."
+        Write-Log "Module $module is already installed."
     }
     else {
-        Write-Output "Installing module $module."
+        Write-Log "Installing module $module."
         Install-Module -Name $module -SkipPublisherCheck -Force
     }
     Import-Module $module
 }
 
-Write-Output "Install the latest version of GIT"
+Write-Log "Install the latest version of GIT"
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     $latestRelease = Invoke-RestMethod -Uri "https://api.github.com/repos/git-for-windows/git/releases/latest"
     $downloadUrl = ($latestRelease.assets | Where-Object { $_.name -like '*64-bit.exe' }).browser_download_url
@@ -51,12 +72,10 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     Invoke-WebRequest -Uri $downloadUrl -OutFile $installerPath
     Start-Process -Wait -FilePath $installerPath -ArgumentList "/VERYSILENT"
     Remove-Item -Path $installerPath -Force
-    Restart-Computer -Force
-    Start-Sleep -Seconds 20
 } else {
-    Write-Output "Git is already installed. Version: $(git --version)"
+    Write-Log "Git is already installed. Version: $(git --version)"
 }
-git --version
+git --version | Out-File -FilePath $logFilePath -Append -Encoding UTF8
 
 # Determine the save location based on the availability of the D:\ drive
 $drive = if (Test-Path D:\) { "D:\" } else { "C:\" }
@@ -65,10 +84,10 @@ $saveLocation = Join-Path -Path $drive -ChildPath ("Git\" + $repoName.Replace('.
 
 # Clone or pull the repository
 if (Test-Path $saveLocation) {
-    Write-Output "Updating the repository at $saveLocation"
+    Write-Log "Updating the repository at $saveLocation"
     Set-Location -Path $saveLocation
-    git pull
+    git pull | Out-File -FilePath $logFilePath -Append -Encoding UTF8
 } else {
-    Write-Output "Cloning the repository to $saveLocation"
-    git clone $repoUrl $saveLocation
+    Write-Log "Cloning the repository to $saveLocation"
+    git clone $repoUrl $saveLocation | Out-File -FilePath $logFilePath -Append -Encoding UTF8
 }
