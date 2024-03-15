@@ -115,7 +115,7 @@ Set-ItemProperty -Path $configKeyPath -Name "AnnounceFlags" -Value $announceFlag
 Set-Service -Name w32time -StartupType Automatic
 Start-Service w32time
 
-Write-Log "Active Directory Domain Services setup has completed. Please verify the installation and configuration."
+Write-Log "Active Directory Domain Services setup has completed."
 Write-Log "Rebooting to complete ADDS installation."
 Start-Sleep -Seconds 5
 Restart-Computer
