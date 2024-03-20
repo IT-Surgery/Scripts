@@ -3,6 +3,7 @@
 Efficient script to ensure a fresh copy of a specified Git repository is downloaded.
 
 .DESCRIPTION
+- Checks for Git and installs it if not present.
 - Manages separate log files for different operations.
 - Determines storage drive preference (D:\ over C:\).
 - Freshly clones the specified Git repository.
@@ -20,6 +21,7 @@ Author:         IT Surgery
 Creation Date:  03-20-2024
 #>
 
+# Setup Logging Function
 function WriteLog {
     Param ([string]$Message, [string]$LogFilePath)
     Write-Output $Message
@@ -40,8 +42,41 @@ function SetupLog {
 # Main Script
 $repoUrl = 'https://github.com/IT-Surgery/Scripts.git'
 
+# Check and Install Git if necessary
+$GitLogFilePath = SetupLog "Logs\Git\" "Check-Install-Git"
+WriteLog "Checking for Git installation" $GitLogFilePath
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+    WriteLog "Git not found. Attempting to install Git via Chocolatey." $GitLogFilePath
+    # Attempt to install Chocolatey if it's not already present
+    if (!(Get-Command choco -ErrorAction SilentlyContinue)) {
+        WriteLog "Installing Chocolatey..." $GitLogFilePath
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        $ChocoInstallScript = (Invoke-WebRequest -Uri 'https://chocolatey.org/install.ps1' -UseBasicParsing).Content
+        Invoke-Expression $ChocoInstallScript
+        WriteLog "Chocolatey installed successfully." $GitLogFilePath
+    }
+    choco install git -y --no-progress | Out-Null
+    WriteLog "Git package installed via Chocolatey." $GitLogFilePath
+}
+
+# Refresh environment PATH to ensure newly installed Git can be recognized
+$env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+
+# Install PowerShell Modules if necessary
+$PwshModulesLogFilePath = SetupLog "Logs\PowerShell\" "Install-PowerShell-Modules"
+Install-PackageProvider -Name NuGet -Force
+$Modules = 'PackageManagement', 'PendingReboot'
+foreach ($Module in $Modules) {
+    if (-not (Get-Module -ListAvailable -Name $Module)) {
+        Install-Module -Name $Module -SkipPublisherCheck -Force
+        Import-Module $Module
+        WriteLog "Installed and imported module $Module." $PwshModulesLogFilePath
+    }
+}
+
 # Clone Repository
-$LogFilePath = SetupLog "Logs\Git\" "Git-Clone"
+$CloneLogFilePath = SetupLog "Logs\Git\" "Git-Clone"
 $Drive = if (Test-Path D:\) { "D:\" } else { "C:\" }
 $urlParts = $repoUrl -split '/'
 $repoOwner = $urlParts[-2]
@@ -49,30 +84,10 @@ $repoName = $urlParts[-1] -replace '\.git$', ''
 $saveLocation = Join-Path -Path $Drive -ChildPath "Git\$repoOwner\$repoName"
 
 if (Test-Path $saveLocation) {
-    WriteLog "Repository exists at $saveLocation. Deleting for a fresh clone." $LogFilePath
-    Remove-Item -Path $saveLocation -Recurse -Force
-}
+    WriteLog "Repository exists at $saveLocation. Deleting for a fresh clone." $CloneLogFilePath
+    Remove-Item -Path $saveLocation -Recurse -Force}
 
-WriteLog "Cloning repository to $saveLocation" $LogFilePath
-$gitCommand = "git clone '$repoUrl' '$saveLocation'"
-$processInfo = New-Object System.Diagnostics.ProcessStartInfo
-$processInfo.FileName = "powershell.exe"
-$processInfo.RedirectStandardError = $true
-$processInfo.RedirectStandardOutput = $true
-$processInfo.UseShellExecute = $false
-$processInfo.Arguments = "-Command $gitCommand"
-$process = New-Object System.Diagnostics.Process
-$process.StartInfo = $processInfo
-$process.Start() | Out-Null
-$stdout = $process.StandardOutput.ReadToEnd()
-$stderr = $process.StandardError.ReadToEnd()
-$process.WaitForExit()
-
-# Log STDOUT and STDERR
-if (-not [string]::IsNullOrWhiteSpace($stdout)) {WriteLog "Output: $stdout" $LogFilePath}
-if (-not [string]::IsNullOrWhiteSpace($stderr)) {
-    # Treat STDERR as warning unless the process exited with a non-zero code which indicates an error
-    if ($process.ExitCode -ne 0) {WriteLog "Error: $stderr" $LogFilePath} else {WriteLog "Warning: $stderr" $LogFilePath}
-}
-if ($process.ExitCode -ne 0) {WriteLog "Failed to clone the repository. See the error message above." $LogFilePath
-} else {WriteLog "Repository cloned successfully to $saveLocation." $LogFilePath}
+WriteLog "Cloning repository to $saveLocation" $CloneLogFilePath
+git clone $repoUrl $saveLocation
+if ($?) {WriteLog "Repository cloned successfully to $saveLocation." $CloneLogFilePath
+} else {WriteLog "Failed to clone the repository. Check for errors in git output." $CloneLogFilePath}
