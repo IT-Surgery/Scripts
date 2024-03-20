@@ -4,7 +4,7 @@ Efficient script to ensure a fresh copy of a specified Git repository is downloa
 
 .DESCRIPTION
 - Checks and installs Git if not present.
-- Consolidates log file management.
+- Manages separate log files for different operations.
 - Installs necessary PowerShell modules.
 - Determines storage drive preference (D:\ over C:\).
 - Freshly clones the specified Git repository.
@@ -17,76 +17,92 @@ PS> .\UpdateGitRepo.ps1
 PS> .\UpdateGitRepo.ps1 -repoUrl 'https://github.com/SomeOtherUser/OtherRepo.git'
 
 .NOTES
-Version:        1.1
+Version:        1.2
 Author:         IT Surgery
-Creation Date:  03-15-2024
+Creation Date:  03-20-2024
 #>
 
-# Helper Functions
 function Write-Log {
-    Param ([string]$Message)
+    Param ([string]$Message, [string]$LogFilePath)
     Write-Output $Message
-    $Message | Out-File -FilePath $global:logFilePath -Append -Encoding UTF8
+    $Message | Out-File -FilePath $LogFilePath -Append -Encoding UTF8
 }
 
 function Setup-Log {
-    Param ([string]$logSubFolder, [string]$logPrefix)
-    $logDrive = if (Test-Path D:\) { "D:\" } else { "C:\" }
-    $logPath = Join-Path -Path $logDrive -ChildPath $logSubFolder
-    if (-not (Test-Path $logPath)) { New-Item -ItemType Directory -Path $logPath -Force | Out-Null }
-    $dateTime = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
-    $logFile = "$logPrefix-$dateTime.log"
-    $logFilePath = Join-Path -Path $logPath -ChildPath $logFile
-    return $logFilePath
+    Param ([string]$LogSubFolder, [string]$LogPrefix)
+    $LogDrive = if (Test-Path D:\) { "D:\" } else { "C:\" }
+    $LogPath = Join-Path -Path $LogDrive -ChildPath $LogSubFolder
+    if (-not (Test-Path $LogPath)) { New-Item -ItemType Directory -Path $LogPath -Force | Out-Null }
+    $DateTime = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
+    $LogFile = "$LogPrefix-$DateTime.log"
+    $LogFilePath = Join-Path -Path $LogPath -ChildPath $LogFile
+    return $LogFilePath
 }
 
 function CheckAndInstallGit {
-    Write-Log "Checking for Git installation"
+    $LogFilePath = Setup-Log "Logs\Git\" "Install-Git"
+    Write-Log "Checking for Git installation" $LogFilePath
     if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-        Write-Log "Git not found. Attempting installation via Chocolatey."
-        if (!(Get-Command choco -ErrorAction SilentlyContinue)) {
-            Write-Log "Installing Chocolatey..."
-            Set-ExecutionPolicy Bypass -Scope Process -Force
-            [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-            $chocoInstallScript = (Invoke-WebRequest -Uri 'https://chocolatey.org/install.ps1' -UseBasicParsing).Content
-            Invoke-Expression $chocoInstallScript
-        }
-        choco install git -y --no-progress | Out-Null
-        $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+        Write-Log "Git not found. Attempting installation via Chocolatey." $LogFilePath
+        Install-Chocolatey $LogFilePath
+        Refresh-Path
         if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
             throw "Git installation failed."
         }
     }
-    Write-Log "Git is installed. Version: $(git --version)"
+    Write-Log "Git is installed. Version: $(git --version)" $LogFilePath
+}
+
+function Install-Chocolatey {
+    Param ([string]$LogFilePath)
+    if (!(Get-Command choco -ErrorAction SilentlyContinue)) {
+        Write-Log "Installing Chocolatey..." $LogFilePath
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        $ChocoInstallScript = (Invoke-WebRequest -Uri 'https://chocolatey.org/install.ps1' -UseBasicParsing).Content
+        Invoke-Expression $ChocoInstallScript
+        Write-Log "Chocolatey installed successfully." $LogFilePath
+    }
+    if (!(choco list --local-only | Select-String -Pattern "git")) {
+        choco install git -y --no-progress | Out-Null
+        Write-Log "Git package installed via Chocolatey." $LogFilePath
+    }
+}
+
+function Refresh-Path {
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+}
+
+function Install-PowerShellModules {
+    $LogFilePath = Setup-Log "Logs\PowerShell\" "PowerShell-Modules-Install"
+    $Modules = 'PackageManagement', 'PendingReboot'
+    foreach ($Module in $Modules) {
+        if (-not (Get-Module -ListAvailable -Name $Module)) {
+            Install-Module -Name $Module -SkipPublisherCheck -Force
+            Import-Module $Module
+            Write-Log "Installed and imported module $Module." $LogFilePath
+        }
+    }
 }
 
 # Main Script
 $repoUrl = 'https://github.com/IT-Surgery/Scripts.git'
-$global:logFilePath = Setup-Log "Logs\Git\" "Clone-Git-Repo"
 
 CheckAndInstallGit
-
-# Installing PowerShell Modules
-$modules = 'PackageManagement', 'PendingReboot'
-foreach ($module in $modules) {
-    if (-not (Get-Module -ListAvailable -Name $module)) {
-        Install-Module -Name $module -SkipPublisherCheck -Force
-        Import-Module $module
-        Write-Log "Installed and imported module $module."
-    }
-}
+Install-PowerShellModules
 
 # Clone Repository
-$drive = if (Test-Path D:\) { "D:\" } else { "C:\" }
+$LogFilePath = Setup-Log "Logs\Git\" "Git-Clone"
+$Drive = if (Test-Path D:\) { "D:\" } else { "C:\" }
 $urlParts = $repoUrl -split '/'
 $repoOwner = $urlParts[-2]
 $repoName = $urlParts[-1] -replace '\.git$', ''
-$saveLocation = Join-Path -Path $drive -ChildPath "Git\$repoOwner\$repoName"
+$saveLocation = Join-Path -Path $Drive -ChildPath "Git\$repoOwner\$repoName"
 
 if (Test-Path $saveLocation) {
-    Write-Log "Repository exists at $saveLocation. Deleting for a fresh clone."
+    Write-Log "Repository exists at $saveLocation. Deleting for a fresh clone." $LogFilePath
     Remove-Item -Path $saveLocation -Recurse -Force
 }
 
-Write-Log "Cloning repository to $saveLocation"
-git clone $repoUrl $saveLocation 2>&1 | Out-File -FilePath $global:logFilePath -Append -Encoding utf8
+Write-Log "Cloning repository to $saveLocation" $LogFilePath
+git clone $repoUrl $saveLocation 2>&1 | Out-File -FilePath $LogFilePath -Append -Encoding utf8
