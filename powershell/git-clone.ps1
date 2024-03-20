@@ -26,28 +26,28 @@ Author:         IT Surgery
 Creation Date:  03-15-2024
 #>
 
-# Define the repository URL
-$repoUrl = 'https://github.com/IT-Surgery/Scripts.git'
-
-# Determine the logs directory based on the availability of the D:\ drive
-$logDrive = if (Test-Path D:\) { "D:\" } else { "C:\" }
-$logPath = Join-Path -Path $logDrive -ChildPath "Logs\Git\"
-
-# Define the log file name with current date and time
-$dateTime = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
-$logFile = "Git-Clone-$dateTime.log"
-$logFilePath = Join-Path -Path $logPath -ChildPath $logFile
-
-# Create the logs directory if it does not exist
-if (-not (Test-Path $logPath)) {
-    New-Item -ItemType Directory -Path $logPath -Force | Out-Null
-}
-
 # Logging function
 function Write-Log {
     Param ([string]$Message)
     Write-Output $Message
     $Message | Out-File -FilePath $logFilePath -Append -Encoding UTF8
+}
+
+# Define the repository URL
+$repoUrl = 'https://github.com/IT-Surgery/Scripts.git'
+
+# Determine the logs directory based on the availability of the D:\ drive
+$logDrive = if (Test-Path D:\) { "D:\" } else { "C:\" }
+$logPath = Join-Path -Path $logDrive -ChildPath "Logs\Chocolatey\"
+
+# Define the log file name with current date and time
+$dateTime = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
+$logFile = "Install-Chocolatey-$dateTime.log"
+$logFilePath = Join-Path -Path $logPath -ChildPath $logFile
+
+# Create the logs directory if it does not exist
+if (-not (Test-Path $logPath)) {
+    New-Item -ItemType Directory -Path $logPath -Force | Out-Null
 }
 
 # Check if Git is installed. If not then install it using Chocolatey.
@@ -62,6 +62,16 @@ if (!(Get-Command choco -ErrorAction SilentlyContinue)) {
         Invoke-Expression $chocoInstallScript
     } else {Write-Log "Failed to download Chocolatey installation script."}
 }
+
+# Determine the logs directory based on the availability of the D:\ drive
+$logDrive = if (Test-Path D:\) { "D:\" } else { "C:\" }
+$logPath = Join-Path -Path $logDrive -ChildPath "Logs\Git\"
+
+# Define the log file name with current date and time
+$dateTime = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
+$logFile = "Install-Git-$dateTime.log"
+$logFilePath = Join-Path -Path $logPath -ChildPath $logFile
+
 # Install Git package
 Write-Log "Installing the Git Chocolatey Package ..."
 foreach ($package in $chocoPackages) {
@@ -85,6 +95,15 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
 }
 Write-Log "Git is installed. Version: $(git --version)"
 
+# Determine the logs directory based on the availability of the D:\ drive
+$logDrive = if (Test-Path D:\) { "D:\" } else { "C:\" }
+$logPath = Join-Path -Path $logDrive -ChildPath "Logs\PowerShell\"
+
+# Define the log file name with current date and time
+$dateTime = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
+$logFile = "Install-PowerShell-Modules-$dateTime.log"
+$logFilePath = Join-Path -Path $logPath -ChildPath $logFile
+
 # Installing PowerShell Modules
 Write-Log "Installing PowerShell Modules"
 Install-PackageProvider -Name NuGet -Force
@@ -99,6 +118,15 @@ foreach ($module in $modules) {
     }
     Import-Module $module
 }
+
+# Determine the logs directory based on the availability of the D:\ drive
+$logDrive = if (Test-Path D:\) { "D:\" } else { "C:\" }
+$logPath = Join-Path -Path $logDrive -ChildPath "Logs\Git\"
+
+# Define the log file name with current date and time
+$dateTime = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
+$logFile = "Clone-Git-Repo-$dateTime.log"
+$logFilePath = Join-Path -Path $logPath -ChildPath $logFile
 
 # Determine the save location based on the availability of the D:\ drive
 $drive = if (Test-Path D:\) { "D:\" } else { "C:\" }
