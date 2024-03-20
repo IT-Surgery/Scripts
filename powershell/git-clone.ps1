@@ -50,7 +50,35 @@ function Write-Log {
     $Message | Out-File -FilePath $logFilePath -Append -Encoding UTF8
 }
 
+# Check if Git is installed. If not then install it using Chocolatey.
+$chocoPackages = 'git'
+Write-Log "Checking if Chocolatey is already installed. If not, install it."
+if (!(Get-Command choco -ErrorAction SilentlyContinue)) {
+    Write-Log "Installing Chocolatey ..."
+    Set-ExecutionPolicy Bypass -Scope Process -Force
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+    $chocoInstallScript = (Invoke-WebRequest -Uri 'https://chocolatey.org/install.ps1' -UseBasicParsing).Content
+    if ($chocoInstallScript) {
+        Invoke-Expression $chocoInstallScript
+    } else {Write-Log "Failed to download Chocolatey installation script."}
+}
+# Install Git package
+Write-Log "Installing the Git Chocolatey Package ..."
+foreach ($package in $chocoPackages) {
+    try {
+        if (!(choco list --local-only | Select-String -Pattern $package)) {
+            choco install $package -y --no-progress | Out-Null
+            Write-Log "$package installed successfully."
+        }
+    } catch {
+        Write-Output "$package is already installed or encountered an error."
+        Write-Log "$package is already installed or encountered an error."
+    }
+}
+
 # Check if Git is installed
+Write-Log "Reloading environmental PATH variables ..."
+$env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
 Write-Log "Checking for Git installation"
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     throw "Git must be installed to use this script."
