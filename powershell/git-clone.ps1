@@ -36,21 +36,19 @@ function Write-Log {
 # Define the repository URL
 $repoUrl = 'https://github.com/IT-Surgery/Scripts.git'
 
-# Determine the logs directory based on the availability of the D:\ drive
+
+# Installing Git using Chocolatey if it is not already installed
+Write-Output "Installing Git using Chocolatey if it is not already installed ..."
+
+# Configuring Log Settings
+Write-Output "Configuring Log Settings ..."
 $logDrive = if (Test-Path D:\) { "D:\" } else { "C:\" }
 $logPath = Join-Path -Path $logDrive -ChildPath "Logs\Chocolatey\"
-
-# Define the log file name with current date and time
 $dateTime = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
 $logFile = "Install-Chocolatey-$dateTime.log"
 $logFilePath = Join-Path -Path $logPath -ChildPath $logFile
+if (-not (Test-Path $logPath)) {New-Item -ItemType Directory -Path $logPath -Force | Out-Null}
 
-# Create the logs directory if it does not exist
-if (-not (Test-Path $logPath)) {
-    New-Item -ItemType Directory -Path $logPath -Force | Out-Null
-}
-
-# Check if Git is installed. If not then install it using Chocolatey.
 $chocoPackages = 'git'
 Write-Log "Checking if Chocolatey is already installed. If not, install it."
 if (!(Get-Command choco -ErrorAction SilentlyContinue)) {
@@ -62,22 +60,17 @@ if (!(Get-Command choco -ErrorAction SilentlyContinue)) {
         Invoke-Expression $chocoInstallScript
     } else {Write-Log "Failed to download Chocolatey installation script."}
 }
+Write-Log "Chocolatey is installed. Continuing with script ..."
 
-# Determine the logs directory based on the availability of the D:\ drive
+Write-Output "Installing Git if it is not already installed ..."
+
+Write-Output "Configuring Log Settings."
 $logDrive = if (Test-Path D:\) { "D:\" } else { "C:\" }
 $logPath = Join-Path -Path $logDrive -ChildPath "Logs\Git\"
-
-# Define the log file name with current date and time
 $dateTime = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
 $logFile = "Install-Git-$dateTime.log"
 $logFilePath = Join-Path -Path $logPath -ChildPath $logFile
-
-# Create the logs directory if it does not exist
-if (-not (Test-Path $logPath)) {
-    New-Item -ItemType Directory -Path $logPath -Force | Out-Null
-}
-
-# Install Git package
+if (-not (Test-Path $logPath)) {New-Item -ItemType Directory -Path $logPath -Force | Out-Null}
 Write-Log "Installing the Git Chocolatey Package ..."
 foreach ($package in $chocoPackages) {
     try {
@@ -85,43 +78,29 @@ foreach ($package in $chocoPackages) {
             choco install $package -y --no-progress | Out-Null
             Write-Log "$package installed successfully."
         }
-    } catch {
-        Write-Output "$package is already installed or encountered an error."
-        Write-Log "$package is already installed or encountered an error."
-    }
+    } catch {Write-Log "$package is already installed or encountered an error."}
 }
-
-# Check if Git is installed
 Write-Log "Reloading environmental PATH variables ..."
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
 Write-Log "Checking for Git installation"
-if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-    throw "Git must be installed to use this script."
-}
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) {throw "Git must be installed to use this script."}
 Write-Log "Git is installed. Version: $(git --version)"
 
-# Determine the logs directory based on the availability of the D:\ drive
+# Installing PowerShell Modules
+Write-Output "Installing PowerShell Modules ..."
+Write-Output "Configuring Log Settings."
 $logDrive = if (Test-Path D:\) { "D:\" } else { "C:\" }
 $logPath = Join-Path -Path $logDrive -ChildPath "Logs\PowerShell\"
-
-# Define the log file name with current date and time
 $dateTime = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
 $logFile = "Install-PowerShell-Modules-$dateTime.log"
 $logFilePath = Join-Path -Path $logPath -ChildPath $logFile
+if (-not (Test-Path $logPath)) {New-Item -ItemType Directory -Path $logPath -Force | Out-Null}
 
-# Create the logs directory if it does not exist
-if (-not (Test-Path $logPath)) {
-    New-Item -ItemType Directory -Path $logPath -Force | Out-Null
-}
-
-# Installing PowerShell Modules
 Write-Log "Installing PowerShell Modules"
 Install-PackageProvider -Name NuGet -Force
 $modules = 'PackageManagement', 'PendingReboot'
 foreach ($module in $modules) {
-    if (Get-Module -ListAvailable -Name $module) {
-        Write-Log "Module $module is already installed."
-    }
+    if (Get-Module -ListAvailable -Name $module) {Write-Log "Module $module is already installed."}
     else {
         Write-Log "Installing module $module."
         Install-Module -Name $module -SkipPublisherCheck -Force
@@ -129,21 +108,18 @@ foreach ($module in $modules) {
     Import-Module $module
 }
 
-# Determine the logs directory based on the availability of the D:\ drive
+# Cloning Git Repository
+Write-Output "Cloning Git Repository ..."
+Write-Output "Configuring Log Settings."
 $logDrive = if (Test-Path D:\) { "D:\" } else { "C:\" }
 $logPath = Join-Path -Path $logDrive -ChildPath "Logs\Git\"
-
-# Define the log file name with current date and time
 $dateTime = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
 $logFile = "Clone-Git-Repo-$dateTime.log"
 $logFilePath = Join-Path -Path $logPath -ChildPath $logFile
-
-# Create the logs directory if it does not exist
-if (-not (Test-Path $logPath)) {
-    New-Item -ItemType Directory -Path $logPath -Force | Out-Null
-}
+if (-not (Test-Path $logPath)) {New-Item -ItemType Directory -Path $logPath -Force | Out-Null}
 
 # Determine the save location based on the availability of the D:\ drive
+Write-Log "Setting the target directory for the Git clone."
 $drive = if (Test-Path D:\) { "D:\" } else { "C:\" }
 $urlParts = $repoUrl -split '/'
 $repoOwner = $urlParts[-2] # The second to last element is typically the owner or organization name
@@ -151,8 +127,7 @@ $repoName = $urlParts[-1] -replace '\.git$', '' # The last element is the reposi
 $saveLocation = Join-Path -Path $drive -ChildPath "Git\$repoOwner\$repoName"
 
 # Clone or refresh the repository
-if (Test-Path $saveLocation) {
-    Write-Log "Repository exists at $saveLocation. Deleting for a fresh clone."
+if (Test-Path $saveLocation) {Write-Log "Repository exists at $saveLocation. Deleting for a fresh clone."
     Remove-Item -Path $saveLocation -Recurse -Force
 }
 
