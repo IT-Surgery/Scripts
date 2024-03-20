@@ -22,13 +22,13 @@ Author:         IT Surgery
 Creation Date:  03-20-2024
 #>
 
-function Write-Log {
+function WriteLog {
     Param ([string]$Message, [string]$LogFilePath)
     Write-Output $Message
     $Message | Out-File -FilePath $LogFilePath -Append -Encoding UTF8
 }
 
-function Setup-Log {
+function SetupLog {
     Param ([string]$LogSubFolder, [string]$LogPrefix)
     $LogDrive = if (Test-Path D:\) { "D:\" } else { "C:\" }
     $LogPath = Join-Path -Path $LogDrive -ChildPath $LogSubFolder
@@ -40,47 +40,48 @@ function Setup-Log {
 }
 
 function CheckAndInstallGit {
-    $LogFilePath = Setup-Log "Logs\Git\" "Install-Git"
-    Write-Log "Checking for Git installation" $LogFilePath
+    $LogFilePath = SetupLog "Logs\Git\" "Install-Git"
+    WriteLog "Checking for Git installation" $LogFilePath
     if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-        Write-Log "Git not found. Attempting installation via Chocolatey." $LogFilePath
-        Install-Chocolatey $LogFilePath
-        Refresh-Path
+        WriteLog "Git not found. Attempting installation via Chocolatey." $LogFilePath
+        InstallChocolatey $LogFilePath
+        RefreshPath
         if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
             throw "Git installation failed."
         }
     }
-    Write-Log "Git is installed. Version: $(git --version)" $LogFilePath
+    WriteLog "Git is installed. Version: $(git --version)" $LogFilePath
 }
 
-function Install-Chocolatey {
+function InstallChocolatey {
     Param ([string]$LogFilePath)
     if (!(Get-Command choco -ErrorAction SilentlyContinue)) {
-        Write-Log "Installing Chocolatey..." $LogFilePath
+        WriteLog "Installing Chocolatey..." $LogFilePath
         Set-ExecutionPolicy Bypass -Scope Process -Force
         [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
         $ChocoInstallScript = (Invoke-WebRequest -Uri 'https://chocolatey.org/install.ps1' -UseBasicParsing).Content
         Invoke-Expression $ChocoInstallScript
-        Write-Log "Chocolatey installed successfully." $LogFilePath
+        WriteLog "Chocolatey installed successfully." $LogFilePath
     }
     if (!(choco list --local-only | Select-String -Pattern "git")) {
         choco install git -y --no-progress | Out-Null
-        Write-Log "Git package installed via Chocolatey." $LogFilePath
+        WriteLog "Git package installed via Chocolatey." $LogFilePath
     }
 }
 
-function Refresh-Path {
+function RefreshPath {
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
 }
 
-function Install-PowerShellModules {
-    $LogFilePath = Setup-Log "Logs\PowerShell\" "PowerShell-Modules-Install"
+function InstallPowerShellModules {
+    Install-PackageProvider -Name NuGet -Force
+    $LogFilePath = SetupLog "Logs\PowerShell\" "PowerShell-Modules-Install"
     $Modules = 'PackageManagement', 'PendingReboot'
     foreach ($Module in $Modules) {
         if (-not (Get-Module -ListAvailable -Name $Module)) {
             Install-Module -Name $Module -SkipPublisherCheck -Force
             Import-Module $Module
-            Write-Log "Installed and imported module $Module." $LogFilePath
+            WriteLog "Installed and imported module $Module." $LogFilePath
         }
     }
 }
@@ -89,10 +90,10 @@ function Install-PowerShellModules {
 $repoUrl = 'https://github.com/IT-Surgery/Scripts.git'
 
 CheckAndInstallGit
-Install-PowerShellModules
+InstallPowerShellModules
 
 # Clone Repository
-$LogFilePath = Setup-Log "Logs\Git\" "Git-Clone"
+$LogFilePath = SetupLog "Logs\Git\" "Git-Clone"
 $Drive = if (Test-Path D:\) { "D:\" } else { "C:\" }
 $urlParts = $repoUrl -split '/'
 $repoOwner = $urlParts[-2]
@@ -100,9 +101,30 @@ $repoName = $urlParts[-1] -replace '\.git$', ''
 $saveLocation = Join-Path -Path $Drive -ChildPath "Git\$repoOwner\$repoName"
 
 if (Test-Path $saveLocation) {
-    Write-Log "Repository exists at $saveLocation. Deleting for a fresh clone." $LogFilePath
+    WriteLog "Repository exists at $saveLocation. Deleting for a fresh clone." $LogFilePath
     Remove-Item -Path $saveLocation -Recurse -Force
 }
 
-Write-Log "Cloning repository to $saveLocation" $LogFilePath
-git clone $repoUrl $saveLocation 2>&1 | Out-File -FilePath $LogFilePath -Append -Encoding utf8
+WriteLog "Cloning repository to $saveLocation" $LogFilePath
+$gitCommand = "git clone '$repoUrl' '$saveLocation'"
+$processInfo = New-Object System.Diagnostics.ProcessStartInfo
+$processInfo.FileName = "powershell.exe"
+$processInfo.RedirectStandardError = $true
+$processInfo.RedirectStandardOutput = $true
+$processInfo.UseShellExecute = $false
+$processInfo.Arguments = "-Command $gitCommand"
+$process = New-Object System.Diagnostics.Process
+$process.StartInfo = $processInfo
+$process.Start() | Out-Null
+$stdout = $process.StandardOutput.ReadToEnd()
+$stderr = $process.StandardError.ReadToEnd()
+$process.WaitForExit()
+
+# Log STDOUT and STDERR
+if (-not [string]::IsNullOrWhiteSpace($stdout)) {Write-Log "Output: $stdout"}
+if (-not [string]::IsNullOrWhiteSpace($stderr)) {
+    # Treat STDERR as warning unless the process exited with a non-zero code which indicates an error
+    if ($process.ExitCode -ne 0) {Write-Log "Error: $stderr"} else {Write-Log "Warning: $stderr"}
+}
+if ($process.ExitCode -ne 0) {Write-Log "Failed to clone the repository. See the error message above."
+} else {Write-Log "Repository cloned successfully to $saveLocation."}
