@@ -3,9 +3,7 @@
 Efficient script to ensure a fresh copy of a specified Git repository is downloaded.
 
 .DESCRIPTION
-- Checks and installs Git if not present.
 - Manages separate log files for different operations.
-- Installs necessary PowerShell modules.
 - Determines storage drive preference (D:\ over C:\).
 - Freshly clones the specified Git repository.
 
@@ -39,58 +37,8 @@ function SetupLog {
     return $LogFilePath
 }
 
-function CheckAndInstallGit {
-    $LogFilePath = SetupLog "Logs\Git\" "Install-Git"
-    WriteLog "Checking for Git installation" $LogFilePath
-    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-        WriteLog "Git not found. Attempting installation via Chocolatey." $LogFilePath
-        InstallChocolatey $LogFilePath
-        RefreshPath
-        if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-            throw "Git installation failed."
-        }
-    }
-    WriteLog "Git is installed. Version: $(git --version)" $LogFilePath
-}
-
-function InstallChocolatey {
-    Param ([string]$LogFilePath)
-    if (!(Get-Command choco -ErrorAction SilentlyContinue)) {
-        WriteLog "Installing Chocolatey..." $LogFilePath
-        Set-ExecutionPolicy Bypass -Scope Process -Force
-        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-        $ChocoInstallScript = (Invoke-WebRequest -Uri 'https://chocolatey.org/install.ps1' -UseBasicParsing).Content
-        Invoke-Expression $ChocoInstallScript
-        WriteLog "Chocolatey installed successfully." $LogFilePath
-    }
-    if (!(choco list --local-only | Select-String -Pattern "git")) {
-        choco install git -y --no-progress | Out-Null
-        WriteLog "Git package installed via Chocolatey." $LogFilePath
-    }
-}
-
-function RefreshPath {
-    $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
-}
-
-function InstallPowerShellModules {
-    Install-PackageProvider -Name NuGet -Force
-    $LogFilePath = SetupLog "Logs\PowerShell\" "PowerShell-Modules-Install"
-    $Modules = 'PackageManagement', 'PendingReboot'
-    foreach ($Module in $Modules) {
-        if (-not (Get-Module -ListAvailable -Name $Module)) {
-            Install-Module -Name $Module -SkipPublisherCheck -Force
-            Import-Module $Module
-            WriteLog "Installed and imported module $Module." $LogFilePath
-        }
-    }
-}
-
 # Main Script
 $repoUrl = 'https://github.com/IT-Surgery/Scripts.git'
-
-CheckAndInstallGit
-InstallPowerShellModules
 
 # Clone Repository
 $LogFilePath = SetupLog "Logs\Git\" "Git-Clone"
@@ -121,10 +69,10 @@ $stderr = $process.StandardError.ReadToEnd()
 $process.WaitForExit()
 
 # Log STDOUT and STDERR
-if (-not [string]::IsNullOrWhiteSpace($stdout)) {Write-Log "Output: $stdout"}
+if (-not [string]::IsNullOrWhiteSpace($stdout)) {WriteLog "Output: $stdout" $LogFilePath}
 if (-not [string]::IsNullOrWhiteSpace($stderr)) {
     # Treat STDERR as warning unless the process exited with a non-zero code which indicates an error
-    if ($process.ExitCode -ne 0) {Write-Log "Error: $stderr"} else {Write-Log "Warning: $stderr"}
+    if ($process.ExitCode -ne 0) {WriteLog "Error: $stderr" $LogFilePath} else {WriteLog "Warning: $stderr" $LogFilePath}
 }
-if ($process.ExitCode -ne 0) {Write-Log "Failed to clone the repository. See the error message above."
-} else {Write-Log "Repository cloned successfully to $saveLocation."}
+if ($process.ExitCode -ne 0) {WriteLog "Failed to clone the repository. See the error message above." $LogFilePath
+} else {WriteLog "Repository cloned successfully to $saveLocation." $LogFilePath}
